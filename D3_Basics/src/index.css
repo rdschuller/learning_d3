@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: 'RozhaOne'; 
+    src: url('/fonts/RozhaOne-Regular.ttf') format('truetype'); 
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  @font-face {
+    font-family: 'Questrial'; 
+    src: url('/fonts/Questrial-Regular.ttf') format('truetype'); 
+    font-weight: normal;
+    font-style: normal;
+  }
