@@ -5,8 +5,8 @@ import React from 'react';
 
 function App() {
   return (
-      <div className="App">
-          <h1 className='bg-blue-700 text- text-4xl font-rozha'>My D3 Chart</h1>
+      <div className="bg-oxford">
+          <h1 className='bg-veridian text- text-4xl font-rozha px-3'>Biggest Agricultural Products by Country</h1>
           <BarChart />
       </div>
   );

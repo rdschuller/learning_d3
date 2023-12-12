@@ -1,17 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import downArrow from '/assets/icons/downArrow.svg'
 
 function BarChart() {
     const [filteredData, setFilteredData] = useState([]); // State for filtered data
-    const allData = useRef(null); // Ref to store the full dataset
+    const [dropOpen, setDropOpen] = useState(false)
+    const [currCountry, setCurrCountry] = useState("New Zealand")
+    
+
+    const allData = useRef(null) // Ref to store the full dataset
+    const countryList = useRef(null)
 
     // Function to filter data based on country
     const loadData = async () => {
         try {
             const dataPath = '/assets/data/agData.csv';
             allData.current = await d3.csv(dataPath);
-            
-            filterDataByCountry("United States of America");
+            countryList.current = Array.from(new Set(allData.current.map(d => d.Area)))
+            console.log(countryList.current);
+
+            filterDataByCountry("New Zealand");
         } catch (error) {
             console.log("There was an error retrieving the data: ", error);
         }
@@ -24,7 +32,7 @@ function BarChart() {
             // get 5 most profitable resources per country
             filtered = filtered.sort((a, b) => d3.descending(+a.Value, +b.Value))
             let topFive = filtered.slice(0, 5);
-
+            console.log(topFive);
             setFilteredData(topFive);
         }
     };
@@ -72,23 +80,9 @@ function BarChart() {
     }
 
     const drawCountryChart = (country) => {
-        // if there is already a chart drawn, remove this chart
-        d3.select("#CountryChart").selectAll("*").remove()
-        // draw new chart
+        // draw new chart or update existing chart
         let config = getCountryChartConfig()
         let scales = getCountryChartScales(country, config);
-
-        // Create axis groups only once, will update them with values when necessary
-        config.container.append("g")
-            .attr("id", "x-axis")
-            .style("transform", `translate(${config.margin.left}px,${config.height - config.margin.bottom}px)`)
-            .call(d3.axisBottom(scales.xScale))
-
-        config.container.append("g")
-            .attr("id", "y-axis")
-            .style("transform", `translate(${config.margin.left}px,${config.margin.top}px)`)
-            .call(d3.axisLeft(scales.yScale))
-
 
         drawBarsCountryChart(country, scales, config)
         drawAxesCountryChart(country, scales, config);
@@ -96,61 +90,77 @@ function BarChart() {
     }
 
     const drawBarsCountryChart = (country, scales, config) => {
-        let {margin, container} = config
+        let { container} = config
         let {xScale, yScale} = scales
         //for transition animation
-        let transition = d3.transition().duration(700)
+        let t = d3.transition().duration(700)
 
-        let body = container.append("g")
-            .style("transform", 
-                `translate(${margin.left}px,${margin.top}px)`
-            )
+        const body = container.select("#chart-body")
 
-        let bars = body.selectAll(".bar")
+        body.selectAll(".bar")
             .data(country)
-
-        //Adding a rect tag for each resource
-        bars.enter().append("rect")
-            .merge(bars)
-            .attr("height", yScale.bandwidth())
-            .attr("y", (d) => yScale(d.Item))
-            .attr("width", 0)
-            .transition(transition)
-            .attr("width", (d) => xScale(d.Value))
-            .attr("fill", "#82204A")
-            
-        
-        bars.exit()
-            .transition(transition)
-            .attr("width", 0)
-            .remove()
+            .join(
+                enter => enter.append("rect")
+                    .attr("class", "bar")
+                    .attr("height", yScale.bandwidth())
+                    .attr("width", 0)
+                    .attr("y", (d) => yScale(d.Item))
+                    .attr("fill", "#82204A")
+                  .call(enter => enter.transition(t)
+                    .attr("width", (d) => xScale(d.Value))),
+                update => update
+                  .call(update => update.transition(t)
+                    .attr("width", (d) => xScale(d.Value))),
+                exit => exit
+                    .attr("width", 0)
+                  .call(exit => exit.transition(t)
+                    .attr("width", 0)
+                    .remove())
+            )
             
     }
     
     
     function drawAxesCountryChart(country, scales, config){
         let {xScale, yScale} = scales
-        let {container, margin, height} = config
+        let {container} = config
         let transition = d3.transition().duration(750)
 
         container.select("#x-axis")
             .transition(transition)
-            .call(d3.axisBottom(xScale))
+            .call(d3.axisBottom(xScale).tickFormat(d3.format("$")).ticks(5))
         
         container.select("#y-axis")
             .transition(transition)
             .call(d3.axisLeft(yScale))
+            .selectAll(".tick text")
+                .text(d => d.length > 20 ? d.substring(0, 20) + "..." : d)
 
         // changing the font
         d3.selectAll(".tick text")
-            .classed("fill-veridian font-questrial text-md", true)
+            .classed("font-questrial text-md", true)
 
     }
 
     //load data upon initial load of the page
     useEffect(() => {
         loadData();
+        let config = getCountryChartConfig()
+        config.container.append("g")
+            .attr("id", "x-axis")
+            .style("transform", `translate(${config.margin.left}px,${config.height - config.margin.bottom}px)`)
+
+        config.container.append("g")
+            .attr("id", "y-axis")
+            .style("transform", `translate(${config.margin.left}px,${config.margin.top}px)`)
+        
+        config.container.append("g")
+            .attr("id", "chart-body")
+            .style("transform", `translate(${config.margin.left}px,${config.margin.top}px)`)
+
+            
     }, []);
+
 
     useEffect(() => {
         if(filteredData.length > 0) {
@@ -164,9 +174,27 @@ function BarChart() {
     };
 
     return (
-        <div className='bg-fuchsia-500'>
-            <svg id='CountryChart' className='border-solid border-stone-500 '/>
-            <button onClick={() => handleCountryChange('Canada')}>Show Canada Data</button>
+        <div className='bg-oxford h-max'>
+            <h1 className='text-white font-rozha text-3xl px-6 pt-4'>{currCountry}</h1>
+            <div className='flex'>
+                <svg id='CountryChart' className='border-solid border-veridian border-4 m-6 mr-8'/>
+                <div className='relative m-8'>
+                    <button onClick={() => setDropOpen(!dropOpen)} className='flex justify-between text-left px-2 h-8 w-44 text-lg rounded-lg overflow-hidden bg-veridian border-2 border-white focus: outline-none focus:border-white font-questrial text-white'>
+                        Change Country
+                        <img src={downArrow} alt="Dropdown Button" className='w-3 pt-2' />
+                    </button>
+                    <ul className={`absolute mt-2 w-48 bg-white py-2 rounded-lg shadow-xl ${dropOpen ? "": "hidden"} overflow-scroll h-40`}>
+                        {countryList.current && countryList.current.map((c) => (
+                            <li onClick={() => {
+                                handleCountryChange(c)
+                                setCurrCountry(c)
+                            
+                            }} key={c} className='block text-left px-4 py-2 text-gray-800 hover:bg-indigo-500 hover:text-white font-questria'>{c}</li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+            
         </div>
     );
 }
